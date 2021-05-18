@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::rc::Rc;
 
 pub trait Graph<T> {
     fn num_of_nodes(&self) -> usize;
@@ -7,6 +8,7 @@ pub trait Graph<T> {
     fn num_of_edges(&self) -> usize;
     fn edges(&self, n: usize) -> &Vec<usize>;
     fn index(&self, n: &T) -> usize;
+    fn key(&self, i: usize) -> &T;
 }
 
 #[derive(Debug)]
@@ -15,7 +17,8 @@ where
     T: Eq + Hash,
 {
     adj: Vec<Vec<usize>>,
-    nodes: HashMap<T, usize>,
+    nodes: HashMap<Rc<T>, usize>,
+    keys: Vec<Rc<T>>,
     is_direct: bool,
 }
 
@@ -27,6 +30,7 @@ where
         AdjGraph {
             adj: Vec::new(),
             nodes: HashMap::new(),
+            keys: Vec::new(),
             is_direct,
         }
     }
@@ -41,7 +45,13 @@ where
 
     fn insert_node(&mut self, n: T) -> usize {
         let size = self.nodes.len();
-        let i = self.nodes.entry(n).or_insert(size);
+        let n = Rc::new(n);
+        let i = self.nodes.entry(Rc::clone(&n)).or_insert(size);
+        if *i >= self.keys.len() {
+            self.keys.push(Rc::clone(&n));
+        } else {
+            self.keys[*i] = Rc::clone(&n);
+        }
         *i
     }
 }
@@ -78,7 +88,11 @@ where
     }
 
     fn index(&self, n: &T) -> usize {
-        self.nodes[&n]
+        self.nodes[n]
+    }
+
+    fn key(&self, i: usize) -> &T {
+        &self.keys[i]
     }
 }
 
@@ -94,8 +108,7 @@ mod tests {
         g.insert("c", "d");
         g.insert("b", "d");
 
-        println!("{:?}", g);
-
+        assert_eq!(2, Rc::strong_count(&g.keys[0]));
         assert_eq!(4, g.num_of_nodes());
         assert_eq!(4, g.num_of_edges());
 
